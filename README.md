@@ -58,7 +58,7 @@ The table below details this information:
 
 Note that if you input an &alpha; = 1, then the code will run DCGAN (see paper for proof).
 
-#Evaluation code
+# Evaluation code
 The `code` directory has `fid_varying_renyigan.py` and `fid_static_renyigan.py` codes,
 which are evaluation codes use to compute the raw FID scores for RenyiGAN-[&beta;<sub>1</sub>, &beta;<sub>2</sub>] 
 and RenyiGAN-&alpha; respectively.
