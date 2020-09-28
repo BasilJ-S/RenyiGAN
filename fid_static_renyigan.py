@@ -61,10 +61,12 @@ def main():
         score_list = pool.map(proc, pFiles)
         np.save('data/v' + str(version) + '/trial' + str(trial_num) + '/alpha' + str(alpha) + '/scores.npy', score_list)
         print(score_list)
-        for epoch in range(250):
-            if epoch != np.nanargmin(score_list):
-                os.remove('data/v' + str(version) + '/trial' + str(trial_num) +
-                          '/alpha' + str(alpha) + '/predictions' + str(epoch) + '.npy')
+        # If you are running low on space, uncomment the below section to automatically delete all prediction.npy files 
+        # except the epoch when the best FID scores occur 
+        # for epoch in range(250):
+        #    if epoch != np.nanargmin(score_list):
+        #        os.remove('data/v' + str(version) + '/trial' + str(trial_num) +
+        #                  '/alpha' + str(alpha) + '/predictions' + str(epoch) + '.npy')
         trial_num = trial_num + 1
 
 

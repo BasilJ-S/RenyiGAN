@@ -61,10 +61,12 @@ def main():
         score_list = pool.map(proc, pFiles)
         np.save('data/annealing/v' + str(version) + '-' + str(subversion) + '/trial' + str(trial_num) + '/scores.npy', score_list)
         print(score_list)
-        for epoch in range(250):
-            if epoch != np.nanargmin(score_list):
-                os.remove('data/annealing/v' + str(version) + '-' + str(subversion) + '/trial' + str(trial_num)
-                          + '/predictions' + str(epoch) + '.npy')
+        # If you are running low on space, uncomment the below code to automatically delete all
+        # predictions.npy files except for the one that has the lowest FID score. 
+        #for epoch in range(250):
+        #    if epoch != np.nanargmin(score_list):
+        #        os.remove('data/annealing/v' + str(version) + '-' + str(subversion) + '/trial' + str(trial_num)
+        #                  + '/predictions' + str(epoch) + '.npy')
         trial_num = trial_num + 1
 
 
