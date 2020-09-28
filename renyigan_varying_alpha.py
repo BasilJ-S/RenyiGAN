@@ -8,27 +8,34 @@ from tensorflow.keras.layers import Dense, BatchNormalization, \
 import utils
 import numpy as np
 
-alpha_num, trial_number, version_num, seed_num = input("Alpha, trial number, version, seed: ").split()
+seed_num, trial_num, version, subversion = input("Seed, trial number, version, subversion: ").split()
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 np.random.seed(int(seed_num))
 tf.random.set_random_seed(int(seed_num))
-
+if int(subversion) == 3:
+    alpha = 1.1
+else:
+    alpha = 0.0
 
 class GAN(object):
-    def __init__(self, alpha, trial_num, version):
+    def __init__(self, alpha, trial_num, version, subversion):
         self.batch_size = 100
         self.n_classes = 10
         self.buffer_size = 50000
         self.training = True
         self.alpha = alpha
+        self.alpha_placeholder = tf.placeholder(tf.float32, shape=[], name='alpha_placeholder')
         self.version = version
+        self.subversion = subversion
         self.trial_num = trial_num
         self.noise_dim = 28 * 28
         self.dropout_constant = 0.6
-        self.epsilon = 1e-8  # To ensure the log doesn't blow up to -infinity
+        self.epsilon = 0.0001  # To ensure the log doesn't blow up to -infinity
         self.predictions = []
-        self._make_directory('data/v' + str(self.version))
-        self._make_directory('data/v' + str(self.version) + '/trial' + str(self.trial_num))
+        self._make_directory('data')
+        self._make_directory('data/varying')
+        self._make_directory('data/varying/v' + str(self.version) + '-' + str(self.subversion))
+        self._make_directory('data/varying/v' + str(self.version) + '-' + str(self.subversion) + '/trial' + str(self.trial_num))
 
     @staticmethod
     def _make_directory(PATH):
@@ -102,7 +109,9 @@ class GAN(object):
 
             fake_loss = -tf.math.log(1 - self.fake_output + self.epsilon)
             fake_loss = tf.math.reduce_mean(fake_loss)
-            dis_loss = real_loss + fake_loss 
+
+            dis_loss = real_loss + fake_loss
+
             return dis_loss
 
     # Vanilla DCGAN discriminator loss function with gradient penalty
@@ -114,9 +123,9 @@ class GAN(object):
             fake_loss = -tf.math.log(1 - self.fake_output + self.epsilon)
             fake_loss = tf.math.reduce_mean(fake_loss)
 
-            gradients = tf.gradients(-tf.math.log(1 /self.real_output - 1), [self.img])[0]
-            r1_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(gradients), axis=[1,2,3]))
-            dis_loss = real_loss + fake_loss  + 5 * r1_penalty
+            gradients = tf.gradients(-tf.math.log(1 / self.real_output - 1), [self.img])[0]
+            r1_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(gradients), axis=[1, 2, 3]))
+            dis_loss = real_loss + fake_loss + 5 * r1_penalty
 
             return dis_loss
 
@@ -132,7 +141,7 @@ class GAN(object):
             dis_loss = - real_loss - gen_loss
             return dis_loss
 
-    # Vanilla DCGAN generator l1 loss function
+    # Vanilla DCGAN generator l1 loss function (mostly for testing)
     def gen_loss_vgan_l1(self):
         with tf.name_scope('genLossVGANL1'):
             fake_loss = tf.math.log(1 - self.fake_output + self.epsilon)
@@ -142,26 +151,29 @@ class GAN(object):
 
     # Vanilla DCGAN generator loss function
     def gen_loss_vgan(self):
+        print("DCGAN")
         with tf.name_scope('genLossVGAN'):
-            fake_loss = - tf.math.log(self.fake_output + self.epsilon)
+            fake_loss = tf.math.log(1 - self.fake_output + self.epsilon)
             gen_loss = tf.math.reduce_mean(fake_loss)
+            return gen_loss
+
+    # RenyiGAN generator loss function 
+    def gen_loss(self):
+        print("RenyiGAN " + str(self.alpha))
+        with tf.name_scope('genLoss'):
+            f = tf.math.reduce_mean(tf.math.pow(1 - self.fake_output, 
+                (self.alpha_placeholder - 1) * tf.ones_like(self.fake_output)))
+            gen_loss = 1.0 / (self.alpha_placeholder - 1) * tf.math.log(f + self.epsilon)
             return gen_loss
 
     # RenyiGAN generator loss function (has l1 norm incorporated)
     def gen_loss_l1(self):
+        print("RenyiGAN " + str(self.alpha))
         with tf.name_scope('genLossL1'):
             f = tf.math.reduce_mean(tf.math.pow(1 - self.fake_output,
-                                                (self.alpha - 1) * tf.ones_like(self.fake_output)))
-            gen_loss = tf.math.abs(1.0 / (self.alpha - 1) * tf.math.log(f + self.epsilon) + tf.math.log(2.0))
-            return gen_loss
-
-    # RenyiGAN generator loss function
-    def gen_loss(self):
-        print("RenyiGAN " + str(self.alpha))
-        with tf.name_scope('genLoss'):
-            f = tf.math.reduce_mean(tf.math.pow(1 - self.fake_output,
-                                                (self.alpha - 1) * tf.ones_like(self.fake_output)))
-            gen_loss = 1.0 / (self.alpha - 1) * tf.math.log(f + self.epsilon)
+                                                (self.alpha_placeholder - 1) * tf.ones_like(self.fake_output)))
+            gen_loss = tf.math.abs(
+                1.0 / (self.alpha_placeholder - 1) * tf.math.log(f + self.epsilon) + tf.math.log(2.0))
             return gen_loss
 
     def optimize(self):
@@ -171,6 +183,14 @@ class GAN(object):
         self.dis_opt_minimize = self.dis_opt.minimize(self.dis_loss_value,
                                                       var_list=self.discriminator.trainable_variables)
 
+    def gen_loss_wrapper(self):
+        self.gen_loss_value = tf.cond(tf.cast(self.alpha_placeholder == 1.0, tf.bool), lambda: self.gen_loss_vgan(),
+                                      lambda: self.gen_loss())
+
+    def gen_loss_wrapper_l1(self):
+        self.gen_loss_value = tf.cond(tf.cast(self.alpha_placeholder == 1.0, tf.bool), lambda: self.gen_loss_vgan_l1(),
+                                      lambda: self.gen_loss_l1())
+
     def build(self):
         self.get_data()
         self.generator = self.build_generator()
@@ -178,20 +198,10 @@ class GAN(object):
         self.fake_output_images = self.generator(tf.random.normal([self.batch_size, self.noise_dim]))
         self.fake_output = self.discriminator(self.fake_output_images)
         self.real_output = self.discriminator(self.img)
-        if self.alpha != 1.0:
-            if self.version == 1 or self.version == 3:
-                print("RenyiGAN no L1 normalization")
-                self.gen_loss_value = self.gen_loss()
-            else:
-                print("RenyiGAN with L1 normalization")
-                self.gen_loss_value = self.gen_loss_l1()
+        if self.version == 1 or self.version == 3:
+            self.gen_loss_wrapper()
         else:
-            if self.version == 1 or self.version == 3:
-                print("Vanilla GAN No L1 normalization")
-                self.gen_loss_value = self.gen_loss_vgan()
-            else:
-                print("Vanilla GAN with L1 normalization")
-                self.gen_loss_value = self.gen_loss_vgan_l1()
+            self.gen_loss_wrapper_l1()
         if self.version == 1 or self.version == 2:
             self.dis_loss_value = self.dis_loss_vgan()
         else:
@@ -208,7 +218,8 @@ class GAN(object):
         try:
             while True:
                 _, disLoss = sess.run([self.dis_opt_minimize, self.dis_loss_value])
-                _, genLoss = sess.run([self.gen_opt_minimize, self.gen_loss_value])
+                _, genLoss = sess.run([self.gen_opt_minimize, self.gen_loss_value],
+                                      feed_dict={self.alpha_placeholder: self.alpha})
                 total_loss_gen += genLoss
                 total_loss_dis += disLoss
                 n_batches += 1
@@ -225,21 +236,22 @@ class GAN(object):
         if len(self.predictions) > 0:
             self.predictions.pop(0)
         self.predictions.append(temp)
-        self._make_directory('data/v' + str(self.version) + '/trial' + str(self.trial_num) + '/alpha' + str(self.alpha))
-        np.save('data/v' + str(self.version) + '/trial' + str(self.trial_num) + '/alpha'
-                + str(self.alpha) + '/predictions' + str(epoch), self.predictions)
+        np.save('data/varying/v' + str(self.version) + '-' + str(self.subversion) 
+                + '/trial' + str(self.trial_num) + '/predictions' + str(epoch),
+                self.predictions)
 
     def train(self, n_epochs):
         self._make_directory('checkpoints')
-        self._make_directory('checkpoints/dcgan_gp/')
-        self._make_directory('checkpoints/dcgan_gp/v' + str(self.version))
-        self.cpt_PATH = 'checkpoints/dcgan_gp/v' + str(self.version) + '/trial' + str(self.trial_num)
+        self._make_directory('checkpoints/varying/')
+        self._make_directory('checkpoints/varying/v' + str(self.version) + '-' + str(self.subversion))
+        self.cpt_PATH = 'checkpoints/varying/v' + str(self.version) + '-' + str(self.subversion) + '/trial' + str(self.trial_num)
         if self.trial_num == 1:
             self._make_directory(self.cpt_PATH)
 
+        go_up = True
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
-            sess.run(self.train_init)
+            sess.run(self.train_init)  # run iterator initilizer to save properly
             checkpoint = tf.train.Saver(
                 {'generator_optimizer': self.gen_opt, 'discriminator_optimizer': self.dis_opt,
                  'generator': self.generator, 'discriminator': self.discriminator, 'iterator': self.iterator},
@@ -251,8 +263,44 @@ class GAN(object):
                         print("Saved checkpoint for step {}: {}".format(int(epoch), save_path))
                 print("Alpha value: " + str(self.alpha))
                 self.train_one_epoch(sess, self.train_init, epoch)
+                # Subversion 1 between [0, 0.9]
+                if self.subversion == 1:
+                    if go_up:
+                        self.alpha = round(self.alpha + 0.1, 1)
+                        if self.alpha == 0.9:
+                            go_up = False
+                    else:
+                        self.alpha = round(self.alpha - 0.1, 1)
+                        if self.alpha == 0.0:
+                            go_up = True
+                # Subversion 2 between [0, 3]
+                elif self.subversion == 2:
+                    if go_up:
+                        self.alpha = round(self.alpha + 0.1, 1)
+                        if self.alpha == 3.0:
+                            go_up = False
+                        if self.alpha == 1.0:
+                            self.alpha = round(1.1, 1)
+                    else:
+                        self.alpha = round(self.alpha - 0.1, 1)
+                        if self.alpha == 0.0:
+                            go_up = True
+                        if self.alpha == 1.0:
+                            self.alpha = round(0.9, 1)
+                # Subversion 3 between [1.1, 4]
+                else:
+                    if go_up:
+                        self.alpha = round(self.alpha + 0.1, 1)
+                        if self.alpha == 4.0:
+                            go_up = False
+                    else:
+                        self.alpha = round(self.alpha - 0.1, 1)
+                        if self.alpha == 1.1:
+                            go_up = True
 
 
-model = GAN(round(float(alpha_num), 1), int(trial_number), int(version_num))
+model = GAN(round(float(alpha), 1), int(trial_num), int(version), int(subversion))
 model.build()
 model.train(n_epochs=250)
+
+

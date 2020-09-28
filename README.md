@@ -9,7 +9,7 @@ Use Python version 3.7.4.
 ## Training RenyiGAN-[&beta;<sub>1</sub>, &beta;<sub>2</sub>]
 To train RenyiGAN-[&beta;<sub>1</sub>, &beta;<sub>2</sub>], run this command
 ```
-python3 code/renyigan_varying_alpha.py
+python3 renyigan_varying_alpha.py
 ```
 which will prompt you to input the seed, trial number, version, and subversion. 
 
@@ -41,7 +41,7 @@ Note that the code only saves the checkpoints for the first trial in the `checkp
 ## Training RenyiGAN-&alpha;
 To train RenyiGAN-&alpha; (i.e. RenyiGAN for a fixed value &alpha; for all epochs during training), run this command:
 ```
-python3 code/renyigan_static_alpha.py
+python3 renyigan_static_alpha.py
 ``` 
 which will prompt you to input the alpha value, trial number, version, and seed. 
 We used seed 123, 5005, 1600, 199621, 60677, 20435, 15859, 33764, 79878, 
@@ -64,12 +64,12 @@ which are evaluation codes use to compute the raw FID scores for RenyiGAN-[&beta
 and RenyiGAN-&alpha; respectively.
 To evaluate RenyiGAN-[&beta;<sub>1</sub>, &beta;<sub>2</sub>], simply run
 ```
-python3 code/fid_varying_renyigan.py
+python3 fid_varying_renyigan.py
 ``` 
 which will prompt you to enter the version, subversion, and the trial number. 
 To evaluate RenyiGAN-&alpha;, simply run
 ```
-python3 code/fid_static_renyigan.py
+python3 fid_static_renyigan.py
 ``` 
 which will prompt you to enter the alpha value and version.
 Note that the evaluation scripts use on the numpy (`.npy`) files that the training files save, 
