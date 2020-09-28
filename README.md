@@ -85,7 +85,4 @@ We also used the Adam optimizer with a learning rate of
 The batch size was chosen to be 100 for the 60,000 MNIST images.
 The total number of epochs was 250 for the MNIST images. 
 
-We used one NVIDIA GP100 GPU and one Intel Xeon 2.6 GHz E7-8867 v3 CPU to run these codes.
-It took us under 45 minutes to train RenyiGAN over 250 epochs and 10 minutes to run the evaluation codes. 
-
 
