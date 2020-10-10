@@ -85,4 +85,4 @@ We also used the Adam optimizer with a learning rate of
 The batch size was chosen to be 100 for the 60,000 MNIST images.
 The total number of epochs was 250 for the MNIST images. 
 
-
+You can find sample images and plots for each version in `images/`. 
