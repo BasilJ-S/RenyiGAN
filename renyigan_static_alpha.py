@@ -11,7 +11,7 @@ import numpy as np
 alpha_num, trial_number, version_num, seed_num = input("Alpha, trial number, version, seed: ").split()
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 np.random.seed(int(seed_num))
-tf.random.set_random_seed(int(seed_num))
+tf.compat.v1.random.set_random_seed(int(seed_num))
 
 
 class GAN(object):
@@ -38,10 +38,10 @@ class GAN(object):
             os.mkdir(PATH)
 
     def get_data(self):
-        with tf.name_scope('data'):
+        with tf.compat.v1.name_scope('data'):
             train_data, test_data = utils.get_mnist_dataset(self.batch_size)
-            self.iterator = tf.data.Iterator.from_structure(train_data.output_types,
-                                                            train_data.output_shapes)
+            self.iterator = tf.compat.v1.data.Iterator.from_structure(tf.compat.v1.data.get_output_types(train_data),
+                                                            tf.compat.v1.data.get_output_shapes(train_data))
             img, _ = self.iterator.get_next()
             self.img = tf.reshape(img, shape=[-1, 28, 28, 1])
 
@@ -49,7 +49,7 @@ class GAN(object):
             self.test_init = self.iterator.make_initializer(test_data)
 
     def build_generator(self):
-        with tf.name_scope('generator') as scope:
+        with tf.compat.v1.name_scope('generator') as scope:
             model = Sequential(name=scope)
             model.add(Dense(7 * 7 * 256, use_bias=False, kernel_initializer=
             RandomNormal(mean=0.0, stddev=0.01), input_shape=(self.noise_dim,)))
@@ -78,7 +78,7 @@ class GAN(object):
             return model
 
     def build_discriminator(self):
-        with tf.name_scope('discriminator') as scope:
+        with tf.compat.v1.name_scope('discriminator') as scope:
             model = Sequential(name=scope)
             model.add(Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=
             RandomNormal(mean=0.0, stddev=0.01)))
@@ -98,7 +98,7 @@ class GAN(object):
 
     # Vanilla DCGAN discriminator loss function
     def dis_loss_vgan(self):
-        with tf.name_scope('disLossVGAN'):
+        with tf.compat.v1.name_scope('disLossVGAN'):
             real_loss = -tf.math.log(self.real_output + self.epsilon)
             real_loss = tf.math.reduce_mean(real_loss)
 
@@ -111,7 +111,7 @@ class GAN(object):
 
     # Vanilla DCGAN discriminator loss function with gradient penalty
     def dis_loss_vgan_gp(self):
-        with tf.name_scope('disLossVGANGP'):
+        with tf.compat.v1.name_scope('disLossVGANGP'):
             real_loss = -tf.math.log(self.real_output + self.epsilon)
             real_loss = tf.math.reduce_mean(real_loss)
 
@@ -126,7 +126,7 @@ class GAN(object):
 
     # RenyiGAN discriminator loss function
     def dis_loss(self):
-        with tf.name_scope('disLoss'):
+        with tf.compat.v1.name_scope('disLoss'):
             real_loss = tf.math.reduce_mean(tf.math.pow(self.real_output, (self.alpha - 1)
                                                         * tf.ones_like(self.real_output)))
             real_loss = 1.0 / (self.alpha - 1) * tf.math.log(real_loss + self.epsilon) + tf.math.log(2.0)
@@ -138,7 +138,7 @@ class GAN(object):
 
     # Vanilla DCGAN generator l1 loss function
     def gen_loss_vgan_l1(self):
-        with tf.name_scope('genLossVGANL1'):
+        with tf.compat.v1.name_scope('genLossVGANL1'):
             fake_loss = tf.math.log(1 - self.fake_output + self.epsilon)
             fake_loss = tf.math.reduce_mean(fake_loss)
             gen_loss = tf.math.abs(fake_loss + tf.math.log(2.0))
@@ -146,14 +146,14 @@ class GAN(object):
 
     # Vanilla DCGAN generator loss function
     def gen_loss_vgan(self):
-        with tf.name_scope('genLossVGAN'):
+        with tf.compat.v1.name_scope('genLossVGAN'):
             fake_loss = - tf.math.log(self.fake_output + self.epsilon)
             gen_loss = tf.math.reduce_mean(fake_loss)
             return gen_loss
 
     # RenyiGAN generator loss function (has l1 norm incorporated)
     def gen_loss_l1(self):
-        with tf.name_scope('genLossL1'):
+        with tf.compat.v1.name_scope('genLossL1'):
             f = tf.math.reduce_mean(tf.math.pow(1 - self.fake_output,
                                                 (self.alpha - 1) * tf.ones_like(self.fake_output)))
             gen_loss = tf.math.abs(1.0 / (self.alpha - 1) * tf.math.log(f + self.epsilon) + tf.math.log(2.0))
@@ -162,16 +162,16 @@ class GAN(object):
     # RenyiGAN generator loss function
     def gen_loss(self):
         print("RenyiGAN " + str(self.alpha))
-        with tf.name_scope('genLoss'):
+        with tf.compat.v1.name_scope('genLoss'):
             f = tf.math.reduce_mean(tf.math.pow(1 - self.fake_output,
                                                 (self.alpha - 1) * tf.ones_like(self.fake_output)))
             gen_loss = 1.0 / (self.alpha - 1) * tf.math.log(f + self.epsilon)
             return gen_loss
 
     def optimize(self):
-        self.gen_opt = tf.train.AdamOptimizer(2e-4, beta1=0.5, name="generator_optimizer")
+        self.gen_opt = tf.compat.v1.train.AdamOptimizer(2e-4, beta1=0.5, name="generator_optimizer")
         self.gen_opt_minimize = self.gen_opt.minimize(self.gen_loss_value, var_list=self.generator.trainable_variables)
-        self.dis_opt = tf.train.AdamOptimizer(2e-4, beta1=0.5, name="discriminator_optimizer")
+        self.dis_opt = tf.compat.v1.train.AdamOptimizer(2e-4, beta1=0.5, name="discriminator_optimizer")
         self.dis_opt_minimize = self.dis_opt.minimize(self.dis_loss_value,
                                                       var_list=self.discriminator.trainable_variables)
 
@@ -242,10 +242,10 @@ class GAN(object):
         if self.trial_num == 1:
             self._make_directory(self.cpt_PATH)
 
-        with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
+        with tf.compat.v1.Session() as sess:
+            sess.run(tf.compat.v1.global_variables_initializer())
             sess.run(self.train_init)
-            checkpoint = tf.train.Saver(
+            checkpoint = tf.compat.v1.train.Saver(
                 {'generator_optimizer': self.gen_opt, 'discriminator_optimizer': self.dis_opt,
                  'generator': self.generator, 'discriminator': self.discriminator, 'iterator': self.iterator},
                 max_to_keep=3)
